@@ -46,7 +46,7 @@ export function startRepl(program) {
     completer: (line) => {
       const completions = [
         'status', 'list', 'enqueue', 'worker start', 'worker stop', 
-        'metrics', 'logs', 'dlq list', 'dlq retry', 'config list', 'config set', 'exit', 'help'
+        'metrics', 'logs', 'dlq list', 'dlq retry', 'config list', 'config set', 'ui', 'exit', 'help'
       ];
       const hits = completions.filter((c) => c.startsWith(line.trim()));
       return [hits.length ? hits : completions, line];
@@ -93,6 +93,7 @@ export function startRepl(program) {
           { command: C.accent('dlq retry <id>'),  description: 'Resurrect a job from DLQ back to pending' },
           { command: C.accent('config list'),     description: 'List all configuration settings' },
           { command: C.accent('config set <k> <v>'), description: 'Update a configuration value (max-retries, backoff-base)' },
+          { command: C.accent('ui'),              description: 'Start the built-in HTTP Web UI dashboard' },
           { command: C.accent('clear'),           description: 'Clear the terminal screen' },
           { command: C.accent('exit / quit'),     description: 'Close the interactive console session' }
         ]

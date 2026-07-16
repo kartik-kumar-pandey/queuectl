@@ -70,6 +70,7 @@ queuectl ➜
 ## Features
 
 - **CLI Interface**: Perform all enqueue, worker management, config, status, and DLQ actions directly from your terminal.
+- **Web UI Console (Premium)**: Serve a clean, professional dark-slate dashboard (AWS/Google Cloud styling) directly from the CLI to manage jobs and view logs in real-time.
 - **Robust Persistence**: Job state and workers are persisted in a local SQLite database, surviving system restarts.
 - **Race Condition Prevention**: Employs SQLite `BEGIN IMMEDIATE` transactions to safely coordinate multiple workers processing jobs in parallel without overlapping execution.
 - **Graceful Shutdown**: Workers listen to termination signals and check the database state, completing their current task before exiting.
@@ -197,7 +198,14 @@ View performance metrics, total runs, success rate percentage, and average/min/m
 queuectl metrics
 ```
 
-### 8. Configurations
+### 8. Web UI Console (Premium Feature)
+Start the built-in HTTP Web UI dashboard to monitor jobs and manage the queue visually from your browser:
+```bash
+queuectl ui --port 5000
+```
+* **Dashboard:** http://localhost:5000 (Provides a professional Google Cloud / AWS-style dashboard for status, enqueuing, DLQ management, metrics, and logs).
+
+### 9. Configurations
 - **View all configs**:
   ```bash
   queuectl config list

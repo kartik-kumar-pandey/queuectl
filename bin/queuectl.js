@@ -12,6 +12,7 @@ import {
   success, error, info, warn, C, gradient, keyValue, timestamp
 } from '../src/ui.js';
 import { startRepl } from '../src/repl.js';
+import { startUiServer } from '../src/ui-server.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const workerPath = path.resolve(__dirname, '../src/worker.js');
@@ -382,6 +383,36 @@ program
       table(columns, rows);
     } catch (err) {
       error(`Failed to get logs: ${err.message}`);
+      process.exit(1);
+    }
+  });
+
+// ─────────────────────────────────────────────────────────────────
+// WEB UI (Premium Enhancements)
+// ─────────────────────────────────────────────────────────────────
+program
+  .command('ui')
+  .description('Start the built-in HTTP Web UI dashboard')
+  .option('--port <number>', 'Port to run the UI server on', '5000')
+  .action((options) => {
+    const port = parseInt(options.port, 10);
+    if (isNaN(port) || port < 1 || port > 65535) {
+      error('Port must be a valid integer between 1 and 65535');
+      process.exit(1);
+    }
+
+    try {
+      startUiServer(port);
+      banner();
+      sectionHeader('WEB UI DASHBOARD ACTIVE', '🌐');
+      keyValue([
+        ['Dashboard URL', `http://localhost:${port}`],
+        ['Status', 'Running (Listening for changes...)'],
+      ]);
+      success('Embedded Web Server started.');
+      info('Keep this terminal open to keep the Web UI running.');
+    } catch (err) {
+      error(`Failed to start Web UI server: ${err.message}`);
       process.exit(1);
     }
   });

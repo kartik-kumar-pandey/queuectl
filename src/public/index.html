@@ -1,0 +1,693 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>QueueCTL Console</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg: #0b0f19;
+      --card-bg: #151b2c;
+      --border: #222b44;
+      --border-hover: #313d60;
+      --primary: #3882f6;
+      --primary-hover: #2563eb;
+      --success: #10b981;
+      --warning: #f59e0b;
+      --error: #ef4444;
+      --text: #f8fafc;
+      --text-muted: #94a3b8;
+      --table-header: #1e293b;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      font-family: 'Inter', sans-serif;
+      background-color: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      padding: 1.5rem 2rem;
+      line-height: 1.5;
+    }
+
+    /* TOP NAVIGATION */
+    header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding-bottom: 1.25rem;
+      border-bottom: 1px solid var(--border);
+      margin-bottom: 2rem;
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+    }
+
+    .brand-logo {
+      background: var(--primary);
+      color: #fff;
+      font-weight: 700;
+      font-size: 0.9rem;
+      padding: 0.35rem 0.65rem;
+      border-radius: 4px;
+      letter-spacing: 0.5px;
+    }
+
+    .brand-title {
+      font-size: 1.25rem;
+      font-weight: 600;
+      color: var(--text);
+    }
+
+    .system-status {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      font-size: 0.85rem;
+      font-weight: 500;
+      color: var(--text-muted);
+      background: #111827;
+      border: 1px solid var(--border);
+      padding: 0.4rem 0.85rem;
+      border-radius: 6px;
+    }
+
+    .status-dot {
+      width: 7px;
+      height: 7px;
+      background-color: var(--success);
+      border-radius: 50%;
+      box-shadow: 0 0 8px var(--success);
+    }
+
+    /* LAYOUT GRID */
+    .dashboard-layout {
+      display: grid;
+      grid-template-columns: 3fr 1fr;
+      gap: 1.75rem;
+      align-items: start;
+    }
+
+    @media (max-width: 1200px) {
+      .dashboard-layout {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    /* SYSTEM CARDS / CARDS */
+    .card {
+      background-color: var(--card-bg);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 1.5rem;
+      margin-bottom: 1.5rem;
+    }
+
+    .card-header-wrapper {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      border-bottom: 1px solid var(--border);
+      padding-bottom: 1rem;
+      margin-bottom: 1.25rem;
+    }
+
+    .card-title {
+      font-size: 1.05rem;
+      font-weight: 600;
+      color: var(--text);
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+
+    /* BREAKDOWN COUNTERS */
+    .metrics-row {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+      gap: 1rem;
+      margin-bottom: 1.25rem;
+    }
+
+    .metric-card {
+      background: #0f1322;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 1rem;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .metric-lbl {
+      font-size: 0.75rem;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      font-weight: 600;
+      letter-spacing: 0.5px;
+    }
+
+    .metric-num {
+      font-size: 1.75rem;
+      font-weight: 700;
+      margin-top: 0.25rem;
+      color: var(--text);
+    }
+
+    /* TABLES (CONSOLE STYLING) */
+    .table-container {
+      overflow-x: auto;
+      border-radius: 6px;
+      border: 1px solid var(--border);
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      text-align: left;
+      font-size: 0.875rem;
+    }
+
+    th {
+      background-color: var(--table-header);
+      color: var(--text-muted);
+      font-weight: 600;
+      padding: 0.75rem 1rem;
+      border-bottom: 1px solid var(--border);
+      font-size: 0.8rem;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    td {
+      padding: 0.85rem 1rem;
+      border-bottom: 1px solid var(--border);
+      background-color: var(--card-bg);
+      color: var(--text);
+    }
+
+    tr:last-child td {
+      border-bottom: none;
+    }
+
+    tr:hover td {
+      background-color: rgba(255, 255, 255, 0.015);
+    }
+
+    /* CONSOLE PILLS / STATES */
+    .pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.35rem;
+      padding: 0.15rem 0.5rem;
+      border-radius: 4px;
+      font-size: 0.75rem;
+      font-weight: 600;
+    }
+
+    .pill-dot {
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+    }
+
+    .pill-pending { background: rgba(245, 158, 11, 0.1); color: var(--warning); border: 1px solid rgba(245, 158, 11, 0.2); }
+    .pill-pending .pill-dot { background: var(--warning); }
+
+    .pill-processing { background: rgba(56, 130, 246, 0.1); color: var(--primary); border: 1px solid rgba(56, 130, 246, 0.2); }
+    .pill-processing .pill-dot { background: var(--primary); }
+
+    .pill-completed { background: rgba(16, 185, 129, 0.1); color: var(--success); border: 1px solid rgba(16, 185, 129, 0.2); }
+    .pill-completed .pill-dot { background: var(--success); }
+
+    .pill-failed { background: rgba(239, 68, 68, 0.1); color: var(--error); border: 1px solid rgba(239, 68, 68, 0.2); }
+    .pill-failed .pill-dot { background: var(--error); }
+
+    .pill-dead { background: rgba(239, 68, 68, 0.15); color: #f87171; border: 1px solid rgba(239, 68, 68, 0.3); }
+    .pill-dead .pill-dot { background: #f87171; }
+
+    /* FORMS & ACTIONS */
+    .form-item {
+      margin-bottom: 1rem;
+    }
+
+    label {
+      display: block;
+      font-size: 0.75rem;
+      color: var(--text-muted);
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      margin-bottom: 0.4rem;
+    }
+
+    input, select {
+      width: 100%;
+      background: #0f1322;
+      border: 1px solid var(--border);
+      padding: 0.65rem 0.85rem;
+      border-radius: 6px;
+      color: var(--text);
+      font-family: inherit;
+      font-size: 0.875rem;
+      transition: border-color 0.15s;
+    }
+
+    input:focus, select:focus {
+      outline: none;
+      border-color: var(--primary);
+    }
+
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      background-color: var(--primary);
+      color: #fff;
+      border: none;
+      padding: 0.65rem 1.25rem;
+      border-radius: 6px;
+      font-size: 0.875rem;
+      font-weight: 600;
+      cursor: pointer;
+      font-family: inherit;
+      width: 100%;
+      transition: background-color 0.15s;
+    }
+
+    .btn:hover {
+      background-color: var(--primary-hover);
+    }
+
+    .btn-secondary {
+      background-color: transparent;
+      border: 1px solid var(--border);
+      color: var(--text);
+      padding: 0.25rem 0.65rem;
+      font-size: 0.75rem;
+      border-radius: 4px;
+      width: auto;
+    }
+
+    .btn-secondary:hover {
+      background-color: var(--border);
+    }
+
+    /* RIGHT COLUMN ALIGNMENT */
+    .side-stats-list {
+      display: flex;
+      flex-direction: column;
+      gap: 0.85rem;
+      font-size: 0.875rem;
+    }
+
+    .side-stat-item {
+      display: flex;
+      justify-content: space-between;
+      border-bottom: 1px dashed var(--border);
+      padding-bottom: 0.5rem;
+    }
+
+    .side-stat-item:last-child {
+      border-bottom: none;
+      padding-bottom: 0;
+    }
+
+    /* POPUP/MODAL WINDOWS */
+    .overlay {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: rgba(0, 0, 0, 0.75);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.15s;
+      z-index: 1000;
+    }
+
+    .overlay.active {
+      opacity: 1;
+      pointer-events: all;
+    }
+
+    .modal-box {
+      background: var(--card-bg);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      width: 90%;
+      max-width: 650px;
+      display: flex;
+      flex-direction: column;
+      box-shadow: 0 12px 36px rgba(0,0,0,0.6);
+    }
+
+    .modal-hdr {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 1rem 1.25rem;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .modal-close-btn {
+      background: none;
+      border: none;
+      color: var(--text-muted);
+      font-size: 1.25rem;
+      cursor: pointer;
+    }
+
+    .modal-bdy {
+      padding: 1.25rem;
+      overflow-y: auto;
+      max-height: 400px;
+    }
+
+    .terminal-box {
+      background: #090c15;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 1rem;
+      font-family: monospace;
+      font-size: 0.85rem;
+      color: #e2e8f0;
+      white-space: pre-wrap;
+      overflow-y: auto;
+    }
+
+    .attempt-title {
+      font-weight: 600;
+      color: var(--primary);
+      margin-top: 0.75rem;
+      border-bottom: 1px solid var(--border);
+      padding-bottom: 0.25rem;
+      margin-bottom: 0.5rem;
+    }
+  </style>
+</head>
+<body>
+
+  <header>
+    <div class="brand">
+      <div class="brand-logo">QCTL</div>
+      <div class="brand-title">QueueCTL Console</div>
+    </div>
+    <div class="system-status">
+      <div class="status-dot"></div>
+      Active Connection
+    </div>
+  </header>
+
+  <div class="dashboard-layout">
+    <!-- LEFT CONTENT AREA -->
+    <div>
+      <!-- BREAKDOWN METRICS -->
+      <div class="card">
+        <div class="card-header-wrapper">
+          <div class="card-title">Queue Status Breakdown</div>
+        </div>
+        <div class="metrics-row">
+          <div class="metric-card" style="border-left: 3px solid var(--warning)">
+            <span class="metric-lbl">Pending</span>
+            <span class="metric-num" id="stat-pending">0</span>
+          </div>
+          <div class="metric-card" style="border-left: 3px solid var(--primary)">
+            <span class="metric-lbl">Processing</span>
+            <span class="metric-num" id="stat-processing">0</span>
+          </div>
+          <div class="metric-card" style="border-left: 3px solid var(--success)">
+            <span class="metric-lbl">Completed</span>
+            <span class="metric-num" id="stat-completed">0</span>
+          </div>
+          <div class="metric-card" style="border-left: 3px solid var(--error)">
+            <span class="metric-lbl">Failed</span>
+            <span class="metric-num" id="stat-failed">0</span>
+          </div>
+          <div class="metric-card" style="border-left: 3px solid #f87171">
+            <span class="metric-lbl">DLQ (Dead)</span>
+            <span class="metric-num" id="stat-dead">0</span>
+          </div>
+        </div>
+        <div style="font-size: 0.85rem; color: var(--text-muted);">
+          Active polling workers: <strong id="active-workers" style="color: var(--success)">0</strong>
+        </div>
+      </div>
+
+      <!-- JOBS TABLE -->
+      <div class="card">
+        <div class="card-header-wrapper">
+          <div class="card-title">Job Executions</div>
+        </div>
+        <div class="table-container">
+          <table>
+            <thead>
+              <tr>
+                <th>Job ID</th>
+                <th>Execution Command</th>
+                <th>Status</th>
+                <th>Retries</th>
+                <th>Priority</th>
+                <th>Runtime</th>
+                <th>Action</th>
+              </tr>
+            </thead>
+            <tbody id="jobs-table-body">
+              <tr>
+                <td colspan="7" style="text-align: center; color: var(--text-muted);">Fetching jobs from SQLite...</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- RIGHT BAR -->
+    <div>
+      <!-- JOB SUBMISSION FORM -->
+      <div class="card">
+        <div class="card-header-wrapper">
+          <div class="card-title">Create Job</div>
+        </div>
+        <form id="enqueue-form">
+          <div class="form-item">
+            <label for="job-id">Job Identifier</label>
+            <input type="text" id="job-id" placeholder="e.g. database-backup" required>
+          </div>
+          <div class="form-item">
+            <label for="job-command">Command String</label>
+            <input type="text" id="job-command" placeholder="e.g. echo backup_done" required>
+          </div>
+          <div class="form-item">
+            <label for="job-retries">Max Retry Count</label>
+            <input type="number" id="job-retries" value="3" min="0">
+          </div>
+          <div class="form-item">
+            <label for="job-priority">Execution Priority</label>
+            <input type="number" id="job-priority" value="0">
+          </div>
+          <div class="form-item">
+            <label for="job-timeout">Timeout (seconds)</label>
+            <input type="number" id="job-timeout" placeholder="Unlimited" min="1">
+          </div>
+          <button type="submit" class="btn">Submit Job</button>
+        </form>
+      </div>
+
+      <!-- PERFORMANCE STATS -->
+      <div class="card">
+        <div class="card-header-wrapper">
+          <div class="card-title">Performance Metrics</div>
+        </div>
+        <div class="side-stats-list">
+          <div class="side-stat-item">
+            <span style="color: var(--text-muted)">Success Rate:</span>
+            <strong id="metric-rate">0%</strong>
+          </div>
+          <div class="side-stat-item">
+            <span style="color: var(--text-muted)">Avg Duration:</span>
+            <strong id="metric-avg">0ms</strong>
+          </div>
+          <div class="side-stat-item">
+            <span style="color: var(--text-muted)">Max Duration:</span>
+            <strong id="metric-max">0ms</strong>
+          </div>
+          <div class="side-stat-item">
+            <span style="color: var(--text-muted)">Total Run Attempts:</span>
+            <strong id="metric-attempts">0</strong>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- DETAILS/LOGS OVERLAY -->
+  <div class="overlay" id="logs-modal-overlay">
+    <div class="modal-box">
+      <div class="modal-hdr">
+        <h4 id="modal-title" style="font-weight: 600;">Job Logs</h4>
+        <button class="modal-close-btn" onclick="closeLogs()">&times;</button>
+      </div>
+      <div class="modal-bdy">
+        <div class="terminal-box" id="log-terminal-output">Fetching logs...</div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    async function updateDashboard() {
+      try {
+        const [statusRes, jobsRes, metricsRes] = await Promise.all([
+          fetch('/api/status'),
+          fetch('/api/jobs'),
+          fetch('/api/metrics')
+        ]);
+
+        const status = await statusRes.json();
+        const jobs = await jobsRes.json();
+        const metrics = await metricsRes.json();
+
+        // Stats
+        document.getElementById('stat-pending').innerText = status.jobs.pending;
+        document.getElementById('stat-processing').innerText = status.jobs.processing;
+        document.getElementById('stat-completed').innerText = status.jobs.completed;
+        document.getElementById('stat-failed').innerText = status.jobs.failed;
+        document.getElementById('stat-dead').innerText = status.jobs.dead;
+        document.getElementById('active-workers').innerText = status.activeWorkers;
+
+        // Metrics
+        document.getElementById('metric-rate').innerText = metrics.successRate + '%';
+        document.getElementById('metric-avg').innerText = metrics.avgDuration + 'ms';
+        document.getElementById('metric-max').innerText = metrics.maxDuration + 'ms';
+        document.getElementById('metric-attempts').innerText = metrics.totalAttempts;
+
+        // Table
+        const tbody = document.getElementById('jobs-table-body');
+        if (jobs.length === 0) {
+          tbody.innerHTML = `<tr><td colspan="7" style="text-align: center; color: var(--text-muted)">No active jobs found in the SQLite backend.</td></tr>`;
+          return;
+        }
+
+        tbody.innerHTML = jobs.map(j => {
+          let btn = '';
+          if (j.state === 'dead') {
+            btn = `<button class="btn-secondary" onclick="retryJob('${j.id}')">🔄 Retry</button>`;
+          } else {
+            btn = `<button class="btn-secondary" onclick="viewLogs('${j.id}')">📜 Logs</button>`;
+          }
+
+          return `
+            <tr>
+              <td><strong style="color: var(--primary); cursor: pointer;" onclick="viewLogs('${j.id}')">${j.id}</strong></td>
+              <td style="font-family: monospace; font-size: 0.8rem; color: #cbd5e1;">${j.command}</td>
+              <td>
+                <span class="pill pill-${j.state}">
+                  <span class="pill-dot"></span>${j.state}
+                </span>
+              </td>
+              <td>${j.attempts}/${j.max_retries}</td>
+              <td>${j.priority}</td>
+              <td style="color: var(--text-muted)">${j.duration_ms ? j.duration_ms + 'ms' : '—'}</td>
+              <td>${btn}</td>
+            </tr>
+          `;
+        }).join('');
+
+      } catch (e) {
+        console.error('API Poll error:', e);
+      }
+    }
+
+    async function retryJob(jobId) {
+      try {
+        const res = await fetch('/api/dlq/retry', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ jobId })
+        });
+        if (res.ok) updateDashboard();
+      } catch (e) {
+        alert('Retry request failed');
+      }
+    }
+
+    async function viewLogs(jobId) {
+      const overlay = document.getElementById('logs-modal-overlay');
+      const title = document.getElementById('modal-title');
+      const terminal = document.getElementById('log-terminal-output');
+
+      title.innerText = `Execution Output: ${jobId}`;
+      terminal.innerText = 'Connecting and fetching logs...';
+      overlay.classList.add('active');
+
+      try {
+        const res = await fetch(`/api/logs?id=${jobId}`);
+        const logs = await res.json();
+
+        if (logs.length === 0) {
+          terminal.innerText = 'No logging output recorded for this execution.';
+          return;
+        }
+
+        terminal.innerHTML = logs.map(l => {
+          return `
+            <div class="attempt-title">Attempt #${l.attempt} (Exit Code: ${l.exit_code}, Duration: ${l.duration_ms}ms)</div>
+            <div style="color: var(--text-muted); margin-bottom: 0.25rem;">[STDOUT]</div>
+            <div style="color: #A0FFA0; margin-bottom: 0.75rem;">${l.stdout || '—'}</div>
+            <div style="color: var(--text-muted); margin-bottom: 0.25rem;">[STDERR]</div>
+            <div style="color: #f87171;">${l.stderr || '—'}</div>
+          `;
+        }).join('');
+      } catch (e) {
+        terminal.innerText = 'Failed to load logs.';
+      }
+    }
+
+    function closeLogs() {
+      document.getElementById('logs-modal-overlay').classList.remove('active');
+    }
+
+    document.getElementById('enqueue-form').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const id = document.getElementById('job-id').value;
+      const command = document.getElementById('job-command').value;
+      const max_retries = parseInt(document.getElementById('job-retries').value, 10);
+      const priority = parseInt(document.getElementById('job-priority').value, 10);
+      const timeoutVal = document.getElementById('job-timeout').value;
+      const timeout = timeoutVal ? parseInt(timeoutVal, 10) : undefined;
+
+      try {
+        const res = await fetch('/api/enqueue', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ id, command, max_retries, priority, timeout })
+        });
+        if (res.ok) {
+          document.getElementById('enqueue-form').reset();
+          updateDashboard();
+        } else {
+          const err = await res.json();
+          alert('Submission Error: ' + err.message);
+        }
+      } catch (e) {
+        alert('Enqueue failed');
+      }
+    });
+
+    updateDashboard();
+    setInterval(updateDashboard, 2000);
+  </script>
+</body>
+</html>
