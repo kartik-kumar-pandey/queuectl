@@ -2,6 +2,71 @@
 
 QueueCTL is a production-grade, local-first background job queue system built with Node.js and SQLite. It supports parallel execution, automatic retries with exponential backoff, a Dead Letter Queue (DLQ) for permanently failed jobs, job timeouts, and graceful shutdown of worker processes.
 
+## 🖥️ Terminal UI Preview
+
+Here is a preview of the unique terminal console dashboard and interactive shell session:
+
+### 1. Interactive Session Banner
+```ansi
+  ╔═══════════════════════════════════════════════════════════╗
+  ║                                                           ║
+  ║    ██████╗ ██╗   ██╗███████╗██╗   ██╗███████╗             ║
+  ║   ██╔═══██╗██║   ██║██╔════╝██║   ██║██╔════╝             ║
+  ║   ██║   ██║██║   ██║█████╗  ██║   ██║█████╗               ║
+  ║   ██║▄▄ ██║██║   ██║██╔══╝  ██║   ██║██╔══╝               ║
+  ║   ╚██████╔╝╚██████╔╝███████╗╚██████╔╝███████╗             ║
+  ║    ╚════▀▀╝ ╚═════╝ ╚══════╝ ╚═════╝ ╚══════╝             ║
+  ║                                                           ║
+  ║              ██████╗████████╗██╗                           ║
+  ║             ██╔════╝╚══██╔══╝██║                           ║
+  ║             ██║        ██║   ██║                           ║
+  ║             ██║        ██║   ██║                           ║
+  ║             ╚██████╗   ██║   ███████╗                      ║
+  ║              ╚═════╝   ╚═╝   ╚══════╝                      ║
+  ║                                                           ║
+  ╚═══════════════════════════════════════════════════════════╝
+     Background Job Queue Engine • v1.0.0
+
+  ✨ Interactive Console Session Initiated.
+  Type help to list commands or exit to quit.
+
+queuectl ➜
+```
+
+### 2. Live System Dashboard (`status` command)
+```ansi
+  ╭───────────────────────────────────────────────────────╮
+  │   SYSTEM DASHBOARD                                    │
+  ├───────────────────────────────────────────────────────┤
+  │                                                       │
+  │   Workers Active   ⬤  3 running                       │
+  │   Total Jobs       8                                  │
+  │                                                       │
+  ├───────────────────────────────────────────────────────┤
+  │   JOB BREAKDOWN                                       │
+  ├───────────────────────────────────────────────────────┤
+  │                                                       │
+  │   ● Pending        ░░░░░░░░░░░░░░░ 0/8                │
+  │   ◉ Processing     ░░░░░░░░░░░░░░░ 0/8                │
+  │   ✔ Completed      █████████░░░░░░ 5/8                │
+  │   ⚠ Failed         ░░░░░░░░░░░░░░░ 0/8                │
+  │   ✖ Dead (DLQ)     ██████░░░░░░░░░ 3/8                │
+  │                                                       │
+  ╰───────────────────────────────────────────────────────╯
+```
+
+### 3. Custom Box-Drawing Table (`list` command)
+```ansi
+╭─────────────┬─────────────────────────────────────┬──────────────┬─────────╮
+│ ID          │ COMMAND                             │ STATE        │ TIMEOUT │
+├─────────────┼─────────────────────────────────────┼──────────────┼─────────┤
+│ success-job │ node -e "console.log('ok')"         │ ✔ completed  │ none    │
+│ fail-job    │ node -e "process.exit(1)"           │ ✖ dead       │ none    │
+│ timeout-job │ node -e "setTimeout(()=>process.... │ ✖ dead       │ 1s      │
+╰─────────────┴─────────────────────────────────────┴──────────────┴─────────╯
+```
+
+
 ## Features
 
 - **CLI Interface**: Perform all enqueue, worker management, config, status, and DLQ actions directly from your terminal.
