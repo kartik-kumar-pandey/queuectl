@@ -1,7 +1,7 @@
 import { spawn } from 'child_process';
-import db from './db.js';
+import db from '../db/connection.js';
 import * as config from './config.js';
-import { workerLog, C } from './ui.js';
+import { workerLog, C } from '../cli-ui/format.js';
 
 // ─────────────────────────────────────────────────────────────────
 // COMMAND EXECUTION
@@ -62,7 +62,7 @@ function claimNextJob() {
     return job;
   });
 
-  return transaction();
+  return transaction.immediate();
 }
 
 // ─────────────────────────────────────────────────────────────────
@@ -94,7 +94,7 @@ export async function startWorker(pid) {
     workerLog(pid, '■', C.warning, 'Graceful shutdown initiated.');
     clearInterval(heartbeatInterval);
     try {
-      db.prepare("UPDATE workers SET status = 'dead' WHERE pid = ?").run(pid);
+      db.prepare("UPDATE workers SET status = 'stopping' WHERE pid = ?").run(pid);
     } catch (e) {}
   };
 
@@ -103,78 +103,88 @@ export async function startWorker(pid) {
 
   // ── Main loop ──
   while (!isStopping) {
-    // Check DB for stop signal
     try {
-      const ws = db.prepare('SELECT status FROM workers WHERE pid = ?').get(pid);
-      if (!ws || ws.status === 'stopping') { shutdown(); break; }
-    } catch (e) {}
-
-    let job = null;
-    try {
-      job = claimNextJob();
-    } catch (e) {
-      await new Promise(r => setTimeout(r, 500));
-      continue;
-    }
-
-    if (!job) {
-      await new Promise(r => setTimeout(r, 1000));
-      continue;
-    }
-
-    const shortCmd = job.command.length > 40 ? job.command.slice(0, 37) + '...' : job.command;
-    workerLog(pid, '⏵', C.accent, `${C.accent(job.id)} → ${C.dim(shortCmd)}`);
-
-    const startTime = Date.now();
-    db.prepare(`UPDATE jobs SET started_at = ? WHERE id = ?`).run(new Date().toISOString(), job.id);
-
-    try {
-      const { stdout, stderr } = await executeCommand(job.command, job.timeout);
-      const durationMs = Date.now() - startTime;
-
-      workerLog(pid, '✔', C.success, `${C.accent(job.id)} completed ${C.dim(`(${durationMs}ms)`)}`);
-
-      // Log output
-      db.prepare(`
-        INSERT INTO job_logs (job_id, attempt, stdout, stderr, exit_code, duration_ms, created_at)
-        VALUES (?, ?, ?, ?, 0, ?, ?)
-      `).run(job.id, job.attempts + 1, stdout || null, stderr || null, durationMs, new Date().toISOString());
-
-      db.prepare(`
-        UPDATE jobs SET state = 'completed', output = ?, duration_ms = ?, updated_at = ? WHERE id = ?
-      `).run(stdout || null, durationMs, new Date().toISOString(), job.id);
-
-    } catch (err) {
-      const durationMs = Date.now() - startTime;
-      const newAttempts = job.attempts + 1;
-      const now = new Date();
-      const errMsg = err.message.trim().slice(0, 60);
-
-      workerLog(pid, '✖', C.error, `${C.accent(job.id)} failed ${C.dim(`(${durationMs}ms)`)}: ${C.error(errMsg)}`);
-
-      // Log failed attempt
-      db.prepare(`
-        INSERT INTO job_logs (job_id, attempt, stdout, stderr, exit_code, duration_ms, created_at)
-        VALUES (?, ?, NULL, ?, -1, ?, ?)
-      `).run(job.id, newAttempts, err.message, durationMs, now.toISOString());
-
-      if (newAttempts >= job.max_retries) {
-        workerLog(pid, '💀', C.dead, `${C.accent(job.id)} → DLQ (${newAttempts}/${job.max_retries} retries exhausted)`);
-        db.prepare(`
-          UPDATE jobs SET state = 'dead', attempts = ?, error_message = ?, duration_ms = ?, updated_at = ? WHERE id = ?
-        `).run(newAttempts, err.message, durationMs, now.toISOString(), job.id);
-      } else {
-        const backoffBase = parseFloat(config.get('backoff-base') || '2');
-        const delaySecs = Math.pow(backoffBase, newAttempts);
-        const runAt = new Date(now.getTime() + delaySecs * 1000).toISOString();
-
-        workerLog(pid, '🔁', C.warning, `${C.accent(job.id)} retry #${newAttempts} in ${delaySecs}s`);
-        db.prepare(`
-          UPDATE jobs SET state = 'failed', attempts = ?, run_at = ?, error_message = ?, duration_ms = ?, updated_at = ? WHERE id = ?
-        `).run(newAttempts, runAt, err.message, durationMs, now.toISOString(), job.id);
+      // Check DB for stop signal
+      try {
+        const ws = db.prepare('SELECT status FROM workers WHERE pid = ?').get(pid);
+        if (!ws || ws.status === 'stopping') { shutdown(); break; }
+      } catch (e) {
+        console.error('Worker loop check stop signal error:', e);
       }
+
+      let job = null;
+      try {
+        job = claimNextJob();
+      } catch (e) {
+        console.error('Worker loop claimNextJob error:', e);
+        await new Promise(r => setTimeout(r, 500));
+        continue;
+      }
+
+      if (!job) {
+        await new Promise(r => setTimeout(r, 1000));
+        continue;
+      }
+
+      const shortCmd = job.command.length > 40 ? job.command.slice(0, 37) + '...' : job.command;
+      workerLog(pid, '⏵', C.accent, `${C.accent(job.id)} → ${C.dim(shortCmd)}`);
+
+      const startTime = Date.now();
+      db.prepare(`UPDATE jobs SET started_at = ? WHERE id = ?`).run(new Date().toISOString(), job.id);
+
+      try {
+        const { stdout, stderr } = await executeCommand(job.command, job.timeout);
+        const durationMs = Date.now() - startTime;
+
+        workerLog(pid, '✔', C.success, `${C.accent(job.id)} completed ${C.dim(`(${durationMs}ms)`)}`);
+
+        // Log output
+        db.prepare(`
+          INSERT INTO job_logs (job_id, attempt, stdout, stderr, exit_code, duration_ms, created_at)
+          VALUES (?, ?, ?, ?, 0, ?, ?)
+        `).run(job.id, job.attempts + 1, stdout || null, stderr || null, durationMs, new Date().toISOString());
+
+        db.prepare(`
+          UPDATE jobs SET state = 'completed', output = ?, duration_ms = ?, updated_at = ? WHERE id = ?
+        `).run(stdout || null, durationMs, new Date().toISOString(), job.id);
+
+      } catch (err) {
+        const durationMs = Date.now() - startTime;
+        const newAttempts = job.attempts + 1;
+        const now = new Date();
+        const errMsg = err.message.trim().slice(0, 60);
+
+        workerLog(pid, '✖', C.error, `${C.accent(job.id)} failed ${C.dim(`(${durationMs}ms)`)}: ${C.error(errMsg)}`);
+
+        // Log failed attempt
+        db.prepare(`
+          INSERT INTO job_logs (job_id, attempt, stdout, stderr, exit_code, duration_ms, created_at)
+          VALUES (?, ?, NULL, ?, -1, ?, ?)
+        `).run(job.id, newAttempts, err.message, durationMs, now.toISOString());
+
+        if (newAttempts >= job.max_retries) {
+          workerLog(pid, '💀', C.dead, `${C.accent(job.id)} → DLQ (${newAttempts}/${job.max_retries} retries exhausted)`);
+          db.prepare(`
+            UPDATE jobs SET state = 'dead', attempts = ?, error_message = ?, duration_ms = ?, updated_at = ? WHERE id = ?
+          `).run(newAttempts, err.message, durationMs, now.toISOString(), job.id);
+        } else {
+          const backoffBase = parseFloat(config.get('backoff-base') || '2');
+          const delaySecs = Math.pow(backoffBase, newAttempts);
+          const runAt = new Date(now.getTime() + delaySecs * 1000).toISOString();
+
+          workerLog(pid, '🔁', C.warning, `${C.accent(job.id)} retry #${newAttempts} in ${delaySecs}s`);
+          db.prepare(`
+            UPDATE jobs SET state = 'failed', attempts = ?, run_at = ?, error_message = ?, duration_ms = ?, updated_at = ? WHERE id = ?
+          `).run(newAttempts, runAt, err.message, durationMs, now.toISOString(), job.id);
+        }
+      }
+    } catch (e) {
+      console.error('Worker loop iteration unhandled error:', e);
     }
   }
+  try {
+    db.prepare("DELETE FROM workers WHERE pid = ?").run(pid);
+  } catch (e) {}
 }
 
 // Direct invocation support

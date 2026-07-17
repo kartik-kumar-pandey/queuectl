@@ -1,4 +1,4 @@
-import db from './db.js';
+import db from '../db/connection.js';
 
 const DEFAULT_CONFIGS = {
   'max-retries': '3',

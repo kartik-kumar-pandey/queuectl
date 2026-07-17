@@ -19,6 +19,17 @@ const C = {
   highlight:chalk.hex('#E040FB'),       // Magenta highlight
 };
 
+export function actionWrapper(fn) {
+  return async (...args) => {
+    try {
+      await fn(...args);
+    } catch (err) {
+      error(err.message);
+      process.exit(1);
+    }
+  };
+}
+
 // ─────────────────────────────────────────────────────────────────
 // GRADIENT TEXT (simulated multi-color)
 // ─────────────────────────────────────────────────────────────────

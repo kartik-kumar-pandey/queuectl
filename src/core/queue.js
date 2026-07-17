@@ -1,4 +1,4 @@
-import db from './db.js';
+import db from '../db/connection.js';
 import * as config from './config.js';
 
 export function enqueue(jobInput) {

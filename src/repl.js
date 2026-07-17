@@ -1,6 +1,6 @@
 import readline from 'readline';
 import chalk from 'chalk';
-import { banner, C, gradient, info, success, error, table, sectionHeader } from './ui.js';
+import { banner, C, gradient, info, success, error, table, sectionHeader } from './cli-ui/format.js';
 
 // Simple argument parser that respects double and single quotes
 function parseCommandString(str) {

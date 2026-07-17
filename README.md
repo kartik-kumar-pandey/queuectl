@@ -220,12 +220,34 @@ queuectl ui --port 5000
 
 ## Verification & Testing
 
-To run the automated verification test suite:
+To run the automated test suite built with Node's native `node:test` framework:
 ```bash
 npm test
 ```
 
-The test runner:
-1. Resets the local SQLite database.
-2. Enqueues a successful job, a failing job, and a job designed to time out.
-3. Spawns a worker and validates that execution, exponential backoff, DLQ migration, and DLQ retries function as expected.
+> [!NOTE]
+> The test suite runs sequentially using the `--test-concurrency=1` flag. This prevents race conditions and test state pollution since all tests share the same local SQLite database file (`queuectl.db`).
+
+The test runner covers:
+1. **Job Enqueuing**: Database schema validation, duplicate primary key constraints.
+2. **Exponential Backoff**: Scheduling intervals based on exponential backoff delays.
+3. **DLQ Handling**: Failed jobs entering DLQ and successful DLQ resurrection.
+4. **Concurrency & Locking**: Parallel worker execution without overlapping job execution.
+5. **Persistence**: Job recovery and persistence across engine restarts.
+
+---
+
+## 📹 Video Demo
+
+A video walkthrough demonstrating QueueCTL command operations, workers, interactive session (REPL), and the Web UI console dashboard is available here:
+[QueueCTL Demo Walkthrough Video](https://www.youtube.com/watch?v=dQw4w9WgXcQ) *(Placeholder Link - Replace with your submission recording URL)*
+
+---
+
+## 🧠 Assumptions & Trade-offs
+
+1. **SQLite as Datastore**: We chose SQLite instead of an in-memory datastore (like Redis) to ensure strict durability and local-first persistence out of the box without requiring external system dependencies. To handle concurrent worker writes, we enabled WAL (Write-Ahead Logging) mode and use atomic database-level transactions (`BEGIN IMMEDIATE`) to serialize claims.
+2. **Process-Level Workers**: Spawning workers using Node's `child_process.fork()` mimics real-world isolated execution environments. However, it incurs higher memory overhead than thread-based systems (`worker_threads`). We accepted this trade-off for improved process-level crash safety and easier integration of arbitrary command lines.
+3. **Polling-Based Workers**: To claim next eligible jobs, workers poll the database every second (configurable or default backoff). While less real-time than pub/sub sockets, polling keeps database connection handling lightweight, robust against network drops, and extremely simple.
+4. **Local Shell Execution**: Commands are run directly on the host using `child_process.spawn`. We assume the host terminal environment has the necessary binaries installed. In production environments, running arbitrary shell strings should be sandboxed or containerized (e.g. Docker) to prevent malicious command execution.
+

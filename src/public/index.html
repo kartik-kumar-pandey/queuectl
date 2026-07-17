@@ -547,6 +547,16 @@
   </div>
 
   <script>
+    function escapeHtml(str) {
+      if (!str) return '';
+      return String(str)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#039;');
+    }
+
     async function updateDashboard() {
       try {
         const [statusRes, jobsRes, metricsRes] = await Promise.all([
@@ -583,15 +593,15 @@
         tbody.innerHTML = jobs.map(j => {
           let btn = '';
           if (j.state === 'dead') {
-            btn = `<button class="btn-secondary" onclick="retryJob('${j.id}')">🔄 Retry</button>`;
+            btn = `<button class="btn-secondary" onclick="retryJob('${escapeHtml(j.id)}')">🔄 Retry</button>`;
           } else {
-            btn = `<button class="btn-secondary" onclick="viewLogs('${j.id}')">📜 Logs</button>`;
+            btn = `<button class="btn-secondary" onclick="viewLogs('${escapeHtml(j.id)}')">📜 Logs</button>`;
           }
 
           return `
             <tr>
-              <td><strong style="color: var(--primary); cursor: pointer;" onclick="viewLogs('${j.id}')">${j.id}</strong></td>
-              <td style="font-family: monospace; font-size: 0.8rem; color: #cbd5e1;">${j.command}</td>
+              <td><strong style="color: var(--primary); cursor: pointer;" onclick="viewLogs('${escapeHtml(j.id)}')">${escapeHtml(j.id)}</strong></td>
+              <td style="font-family: monospace; font-size: 0.8rem; color: #cbd5e1;">${escapeHtml(j.command)}</td>
               <td>
                 <span class="pill pill-${j.state}">
                   <span class="pill-dot"></span>${j.state}
@@ -633,7 +643,7 @@
       overlay.classList.add('active');
 
       try {
-        const res = await fetch(`/api/logs?id=${jobId}`);
+        const res = await fetch(`/api/logs?id=${encodeURIComponent(jobId)}`);
         const logs = await res.json();
 
         if (logs.length === 0) {
@@ -645,9 +655,9 @@
           return `
             <div class="attempt-title">Attempt #${l.attempt} (Exit Code: ${l.exit_code}, Duration: ${l.duration_ms}ms)</div>
             <div style="color: var(--text-muted); margin-bottom: 0.25rem;">[STDOUT]</div>
-            <div style="color: #A0FFA0; margin-bottom: 0.75rem;">${l.stdout || '—'}</div>
+            <div style="color: #A0FFA0; margin-bottom: 0.75rem;">${escapeHtml(l.stdout) || '—'}</div>
             <div style="color: var(--text-muted); margin-bottom: 0.25rem;">[STDERR]</div>
-            <div style="color: #f87171;">${l.stderr || '—'}</div>
+            <div style="color: #f87171;">${escapeHtml(l.stderr) || '—'}</div>
           `;
         }).join('');
       } catch (e) {

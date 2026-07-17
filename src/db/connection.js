@@ -3,12 +3,13 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const dbPath = path.resolve(__dirname, '../queuectl.db');
+const dbPath = path.resolve(__dirname, '../../queuectl.db');
 
 const db = new Database(dbPath);
 
 // Enable WAL mode to allow concurrent reads and writes
 db.pragma('journal_mode = WAL');
+db.pragma('busy_timeout = 5000');
 
 // Execute migrations to create tables
 db.exec(`
