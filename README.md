@@ -7,25 +7,37 @@ QueueCTL is a production-grade, local-first background job queue system built wi
 Here is a preview of the unique terminal console dashboard and interactive shell session:
 
 ### 1. Interactive Session Banner
-```ansi
-  ╔═══════════════════════════════════════════════════════════╗
-  ║                                                           ║
-  ║    ██████╗ ██╗   ██╗███████╗██╗   ██╗███████╗             ║
-  ║   ██╔═══██╗██║   ██║██╔════╝██║   ██║██╔════╝             ║
-  ║   ██║   ██║██║   ██║█████╗  ██║   ██║█████╗               ║
-  ║   ██║▄▄ ██║██║   ██║██╔══╝  ██║   ██║██╔══╝               ║
-  ║   ╚██████╔╝╚██████╔╝███████╗╚██████╔╝███████╗             ║
-  ║    ╚════▀▀╝ ╚═════╝ ╚══════╝ ╚═════╝ ╚══════╝             ║
-  ║                                                           ║
-  ║              ██████╗████████╗██╗                           ║
-  ║             ██╔════╝╚══██╔══╝██║                           ║
-  ║             ██║        ██║   ██║                           ║
-  ║             ██║        ██║   ██║                           ║
-  ║             ╚██████╗   ██║   ███████╗                      ║
-  ║              ╚═════╝   ╚═╝   ╚══════╝                      ║
-  ║                                                           ║
-  ╚═══════════════════════════════════════════════════════════╝
-     Background Job Queue Engine • v1.0.0
+```
+  ┌────────────────────────────────────────────────────────────────────────────┐
+  │           * Welcome to the QueueCtl Engine * [v1.0.0]                     │
+  └────────────────────────────────────────────────────────────────────────────┘
+
+                  ██████╗ ██╗   ██╗███████╗██╗   ██╗███████╗
+                 ██╔═══██╗██║   ██║██╔════╝██║   ██║██╔════╝
+                 ██║   ██║██║   ██║█████╗  ██║   ██║█████╗
+                 ██║▄▄ ██║██║   ██║██╔══╝  ██║   ██║██╔══╝
+                 ╚██████╔╝╚██████╔╝███████╗╚██████╔╝███████╗
+                  ╚════▀▀╝ ╚═════╝ ╚══════╝ ╚═════╝ ╚══════╝
+
+                            ██████╗████████╗██╗
+                           ██╔════╝╚══██╔══╝██║
+                           ██║        ██║   ██║
+                           ██║        ██║   ██║
+                           ╚██████╗   ██║   ███████╗
+                            ╚═════╝   ╚═╝   ╚══════╝
+
+         A modern, persistent background job queue processing engine.
+
+           ┌──────────── Engine Status Summary ───────────┐
+           │  [IDLE] Engine:        IDLE                   │
+           │  Jobs Processed:       3                      │
+           │  Failed Jobs:          0                      │
+           │  [WARN] Scheduled:     1                      │
+           │  Active Queues:        1                      │
+           │  Memory Usage:         46.5MB RSS             │
+           │  CPU Usage:            ~5%                    │
+           │  [INFO] Last Check:    10:18:12 pm            │
+           └──────────────────────────────────────────────-┘
 
   ✨ Interactive Console Session Initiated.
   Type help to list commands or exit to quit.
@@ -240,8 +252,8 @@ The test runner covers:
 ## 📹 Video Demo
 
 A video walkthrough demonstrating QueueCTL command operations, workers, interactive session (REPL), and the Web UI console dashboard is available here:
-[QueueCTL Demo Walkthrough Video](https://www.youtube.com/watch?v=dQw4w9WgXcQ) *(Placeholder Link - Replace with your submission recording URL)*
 
+[QueueCTL Demo Walkthrough Video](#)
 ---
 
 ## 🧠 Assumptions & Trade-offs

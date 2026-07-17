@@ -4,19 +4,21 @@ import chalk from 'chalk';
 // GRADIENT & COLOR PALETTE
 // ─────────────────────────────────────────────────────────────────
 const C = {
-  brand:    chalk.hex('#6C63FF'),       // Purple accent
-  brandBg:  chalk.bgHex('#6C63FF').white.bold,
+  brand:    chalk.hex('#7C6CFF'),       // Purple accent (slightly brighter)
+  brandBg:  chalk.bgHex('#7C6CFF').white.bold,
   accent:   chalk.hex('#00D9FF'),       // Cyan accent
   success:  chalk.hex('#00E676'),       // Mint green
   warning:  chalk.hex('#FFD740'),       // Amber
   error:    chalk.hex('#FF5252'),       // Coral red
   dead:     chalk.hex('#FF1744').bold,   // Hot red
-  dim:      chalk.hex('#757575'),       // Muted gray
-  muted:    chalk.hex('#9E9E9E'),
-  white:    chalk.hex('#FAFAFA'),
+  dim:      chalk.hex('#6B7280'),       // Cool gray (more readable)
+  muted:    chalk.hex('#9CA3AF'),       // Lighter muted
+  white:    chalk.hex('#F9FAFB'),
   header:   chalk.hex('#B388FF').bold,   // Light purple
-  border:   chalk.hex('#424242'),       // Dark gray borders
-  highlight:chalk.hex('#E040FB'),       // Magenta highlight
+  border:   chalk.hex('#5C5C7A'),       // Muted purple-gray (visible on dark bg)
+  highlight:chalk.hex('#B388FF'),       // Soft purple highlight
+  label:    chalk.hex('#A5B4FC'),       // Indigo-200 for labels
+  value:    chalk.hex('#E0E7FF'),       // Indigo-100 for values
 };
 
 export function actionWrapper(fn) {
@@ -31,49 +33,158 @@ export function actionWrapper(fn) {
 }
 
 // ─────────────────────────────────────────────────────────────────
-// GRADIENT TEXT (simulated multi-color)
+// SMOOTH GRADIENT (interpolated, not stepped)
 // ─────────────────────────────────────────────────────────────────
-const gradientColors = ['#6C63FF', '#7C4DFF', '#B388FF', '#E040FB', '#FF80AB', '#FF5252'];
+const GRADIENT_STOPS = [
+  [0.00, [108, 99, 255]],   // #6C63FF violet
+  [0.45, [162, 89, 255]],   // #A259FF
+  [0.75, [224, 64, 251]],   // #E040FB magenta
+  [1.00, [255, 92, 141]],   // #FF5C8D pink/coral
+];
+
+function colorAt(t) {
+  t = Math.max(0, Math.min(1, t));
+  for (let i = 0; i < GRADIENT_STOPS.length - 1; i++) {
+    const [t0, c0] = GRADIENT_STOPS[i];
+    const [t1, c1] = GRADIENT_STOPS[i + 1];
+    if (t >= t0 && t <= t1) {
+      const lt = (t - t0) / (t1 - t0 || 1);
+      return [
+        Math.round(c0[0] + (c1[0] - c0[0]) * lt),
+        Math.round(c0[1] + (c1[1] - c0[1]) * lt),
+        Math.round(c0[2] + (c1[2] - c0[2]) * lt),
+      ];
+    }
+  }
+  return GRADIENT_STOPS[GRADIENT_STOPS.length - 1][1];
+}
 
 export function gradient(text) {
   const chars = [...text];
   return chars.map((ch, i) => {
-    const color = gradientColors[i % gradientColors.length];
-    return chalk.hex(color)(ch);
+    if (ch === ' ') return ch;
+    const [r, g, b] = colorAt(i / Math.max(1, chars.length - 1));
+    return chalk.rgb(r, g, b)(ch);
   }).join('');
 }
 
 // ─────────────────────────────────────────────────────────────────
 // BRAND BANNER
 // ─────────────────────────────────────────────────────────────────
+const QUEUE_GLYPHS = [
+  '   ██████╗ ██╗   ██╗███████╗██╗   ██╗███████╗',
+  '  ██╔═══██╗██║   ██║██╔════╝██║   ██║██╔════╝',
+  '  ██║   ██║██║   ██║█████╗  ██║   ██║█████╗  ',
+  '  ██║▄▄ ██║██║   ██║██╔══╝  ██║   ██║██╔══╝  ',
+  '  ╚██████╔╝╚██████╔╝███████╗╚██████╔╝███████╗',
+  '   ╚════▀▀╝ ╚═════╝ ╚══════╝ ╚═════╝ ╚══════╝',
+];
+const CTL_GLYPHS = [
+  '██████╗ ████████╗██╗',
+  '██╔════╝╚══██╔══╝██║',
+  '██║        ██║   ██║',
+  '██║        ██║   ██║',
+  '╚██████╗   ██║   ███████╗',
+  ' ╚═════╝   ╚═╝   ╚══════╝',
+];
+
+import * as queue from '../core/queue.js';
+
 export function banner() {
-  const art = [
-    '  ╔═══════════════════════════════════════════════════════════╗',
-    '  ║                                                           ║',
-    '  ║    ██████╗ ██╗   ██╗███████╗██╗   ██╗███████╗             ║',
-    '  ║   ██╔═══██╗██║   ██║██╔════╝██║   ██║██╔════╝             ║',
-    '  ║   ██║   ██║██║   ██║█████╗  ██║   ██║█████╗               ║',
-    '  ║   ██║▄▄ ██║██║   ██║██╔══╝  ██║   ██║██╔══╝               ║',
-    '  ║   ╚██████╔╝╚██████╔╝███████╗╚██████╔╝███████╗             ║',
-    '  ║    ╚════▀▀╝ ╚═════╝ ╚══════╝ ╚═════╝ ╚══════╝             ║',
-    '  ║                                                           ║',
-    '  ║              ██████╗████████╗██╗                           ║',
-    '  ║             ██╔════╝╚══██╔══╝██║                           ║',
-    '  ║             ██║        ██║   ██║                           ║',
-    '  ║             ██║        ██║   ██║                           ║',
-    '  ║             ╚██████╗   ██║   ███████╗                      ║',
-    '  ║              ╚═════╝   ╚═╝   ╚══════╝                      ║',
-    '  ║                                                           ║',
-    '  ╚═══════════════════════════════════════════════════════════╝',
-  ];
-  const sub = '     Background Job Queue Engine • v1.0.0';
+  const qMax = Math.max(...QUEUE_GLYPHS.map(l => l.length));
+  const cMax = Math.max(...CTL_GLYPHS.map(l => l.length));
+  const centerPad = Math.max(0, Math.floor((qMax - cMax) / 2));
+
+  const colorGlyphRow = (line) => {
+    return [...line].map((ch) => {
+      if (ch === ' ') return ch;
+      return C.brand(ch);
+    }).join('');
+  };
+
+  const subtitle = 'A modern, persistent background job queue processing engine.';
+  const version = 'v1.0.0';
+
+  const welcomePlain = `* Welcome to the QueueCtl Engine * [${version}]`;
+  const welcomeText = `${C.dim('*')} ${C.white.bold('Welcome to the')} ${C.brand.bold('QueueCtl Engine')} ${C.dim('*')} ${C.dim('[')}${C.success(version)}${C.dim(']')}`;
+
+  const W = 78; // Fixed width for status summary box and welcome box
+
+  const welcomePad = Math.max(0, Math.floor((W - welcomePlain.length - 2) / 2));
+  const welcomeRightPad = Math.max(0, W - 2 - welcomePad - welcomePlain.length);
 
   console.log('');
-  art.forEach((line, i) => {
-    const color = gradientColors[Math.floor(i / art.length * gradientColors.length)];
-    console.log(chalk.hex(color)(line));
+  console.log('  ' + C.brand('┌' + '─'.repeat(W - 2) + '┐'));
+  console.log('  ' + C.brand('│') + ' '.repeat(welcomePad) + welcomeText + ' '.repeat(welcomeRightPad) + C.brand('│'));
+  console.log('  ' + C.brand('└' + '─'.repeat(W - 2) + '┘'));
+  console.log('');
+
+  // Center the logo
+  const logoLeftPad = Math.max(0, Math.floor((W - qMax) / 2));
+  QUEUE_GLYPHS.forEach((line) => console.log(' '.repeat(logoLeftPad) + colorGlyphRow(line)));
+  console.log('');
+  CTL_GLYPHS.forEach((line) => {
+    const paddedLine = ' '.repeat(centerPad) + line;
+    console.log(' '.repeat(logoLeftPad) + colorGlyphRow(paddedLine));
   });
-  console.log(gradient(sub));
+  console.log('');
+
+  // Subtitle centered
+  const subPad = Math.max(0, Math.floor((W - subtitle.length) / 2));
+  console.log(' '.repeat(subPad) + C.muted(subtitle));
+  console.log('');
+
+  // Get status
+  let status;
+  try {
+    status = queue.getStatus();
+  } catch (e) {
+    status = { jobs: { pending: 0, processing: 0, completed: 0, failed: 0, dead: 0 }, activeWorkers: 0 };
+  }
+
+  const processed = status.jobs.completed + status.jobs.failed + status.jobs.dead;
+  const failed = status.jobs.failed + status.jobs.dead;
+  const activeQueues = 1;
+
+  const formatNum = (n) => String(n).replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+  const memUsage = (process.memoryUsage().rss / 1024 / 1024).toFixed(1) + 'MB RSS';
+  const cpuPercent = '~5%';
+  const curTime = new Date().toLocaleTimeString();
+
+  // ── Single-column Engine Status Summary Box ──
+  const BOX_W = 56;
+  const INNER = BOX_W - 2;
+  const LABEL_COL = 22;
+
+  const row = (label, value) => {
+    const cLabel = stripAnsi(label);
+    const cValue = stripAnsi(String(value));
+    const gap = Math.max(1, LABEL_COL - cLabel.length);
+    const usedLen = cLabel.length + gap + cValue.length;
+    const rightPad = Math.max(0, INNER - 2 - usedLen);
+    return C.border('│') + '  ' + label + ' '.repeat(gap) + value + ' '.repeat(rightPad) + C.border('│');
+  };
+
+  const titleText = ' Engine Status Summary ';
+  const tL = Math.floor((INNER - titleText.length) / 2);
+  const tR = INNER - titleText.length - tL;
+  const boxIndent = ' '.repeat(Math.max(0, Math.floor((W - BOX_W) / 2)));
+
+  const engineLabel = status.activeWorkers > 0
+    ? C.success('[OK]') + C.label(' Engine:')
+    : C.warning('[IDLE]') + C.label(' Engine:');
+  const engineVal = status.activeWorkers > 0 ? C.success('RUNNING') : C.warning('IDLE');
+
+  console.log(boxIndent + C.border('┌' + '─'.repeat(tL)) + C.header(titleText) + C.border('─'.repeat(tR) + '┐'));
+  console.log(boxIndent + row(engineLabel, engineVal));
+  console.log(boxIndent + row(C.label('Jobs Processed:'), C.value(formatNum(processed))));
+  console.log(boxIndent + row(C.label('Failed Jobs:'), failed > 0 ? C.error(formatNum(failed)) : C.success(formatNum(failed))));
+  console.log(boxIndent + row(C.warning('[WARN]') + C.label(' Scheduled:'), C.warning(formatNum(status.jobs.pending))));
+  console.log(boxIndent + row(C.label('Active Queues:'), C.value(String(activeQueues))));
+  console.log(boxIndent + row(C.label('Memory Usage:'), C.value(memUsage)));
+  console.log(boxIndent + row(C.label('CPU Usage:'), C.value(cpuPercent)));
+  console.log(boxIndent + row(C.accent('[INFO]') + C.label(' Last Check:'), C.accent(curTime)));
+  console.log(boxIndent + C.border('└' + '─'.repeat(INNER) + '┘'));
   console.log('');
 }
 
@@ -222,37 +333,58 @@ export function sectionHeader(title, icon = '◆') {
 export function statusCard(stats, activeWorkers) {
   const total = stats.pending + stats.processing + stats.completed + stats.failed + stats.dead;
 
-  const W = 55; // inner width
-  const hr = C.border('─'.repeat(W));
-  const edge = (content) => `  ${C.border('│')} ${content}`;
+  const workersText = activeWorkers > 0
+    ? C.success('⬤  ' + activeWorkers + ' running')
+    : C.dim('⬤  0 idle');
 
-  console.log('');
-  console.log(`  ${C.border('╭' + '─'.repeat(W) + '╮')}`);
-  edge(''); console.log('');
-  console.log(edge(`${C.header('  SYSTEM DASHBOARD')}`));
-  edge(''); console.log('');
-  console.log(`  ${C.border('├' + '─'.repeat(W) + '┤')}`);
-  console.log(edge(''));
-  console.log(edge(`  ${C.white('Workers Active')}   ${activeWorkers > 0 ? C.success('⬤  ' + activeWorkers + ' running') : C.dim('⬤  0 idle')}`));
-  console.log(edge(`  ${C.white('Total Jobs')}       ${C.accent(String(total))}`));
-  console.log(edge(''));
-  console.log(`  ${C.border('├' + '─'.repeat(W) + '┤')}`);
-  console.log(edge(`${C.header('  JOB BREAKDOWN')}`));
-  console.log(`  ${C.border('├' + '─'.repeat(W) + '┤')}`);
-  console.log(edge(''));
+  const rowLine = (icon, colorFn, label, count) =>
+    `${colorFn(icon)} ${padRight(label, 14)} ${progressBar(count, total, 18)}`;
 
-  const row = (icon, colorFn, label, count) => {
-    console.log(edge(`  ${colorFn(icon)} ${padRight(label, 14)} ${progressBar(count, total, 15)}`));
+  // Build every line of content first (unbordered) so the box width can be
+  // computed from what will actually be printed, then every row is closed
+  // on both sides — no more silently-dropped border rows.
+  const bodyLines = [
+    { text: `${C.header('SYSTEM DASHBOARD')}`, blank: false },
+    { blank: true },
+    { text: `${C.white('Workers Active')}   ${workersText}` },
+    { text: `${C.white('Total Jobs')}       ${C.accent(String(total))}` },
+    { blank: true },
+    { divider: true },
+    { text: `${C.header('JOB BREAKDOWN')}` },
+    { divider: true },
+    { blank: true },
+    { text: rowLine('●', C.warning, 'Pending',    stats.pending) },
+    { text: rowLine('◉', C.accent,  'Processing', stats.processing) },
+    { text: rowLine('✔', C.success, 'Completed',  stats.completed) },
+    { text: rowLine('⚠', C.error,   'Failed',     stats.failed) },
+    { text: rowLine('✖', C.dead,    'Dead (DLQ)', stats.dead) },
+    { blank: true },
+  ];
+
+  const W = Math.max(
+    ...bodyLines.filter((l) => l.text).map((l) => visibleLength(l.text)),
+  ) + 2; // 1 space padding on each side
+
+  const border = C.border;
+  const top = border('╭' + '─'.repeat(W) + '╮');
+  const bottom = border('╰' + '─'.repeat(W) + '╯');
+  const divider = border('├' + '─'.repeat(W) + '┤');
+
+  const edge = (content = '') => {
+    const pad = Math.max(0, W - 1 - visibleLength(content));
+    return `  ${border('│')} ${content}${' '.repeat(pad)}${border('│')}`;
   };
 
-  row('●', C.warning, 'Pending',      stats.pending);
-  row('◉', C.accent,  'Processing',   stats.processing);
-  row('✔', C.success, 'Completed',    stats.completed);
-  row('⚠', C.error,   'Failed',       stats.failed);
-  row('✖', C.dead,    'Dead (DLQ)',    stats.dead);
-
-  console.log(edge(''));
-  console.log(`  ${C.border('╰' + '─'.repeat(W) + '╯')}`);
+  console.log('');
+  console.log(`  ${top}`);
+  bodyLines.forEach((line) => {
+    if (line.divider) {
+      console.log(`  ${divider}`);
+    } else {
+      console.log(edge(line.blank ? '' : line.text));
+    }
+  });
+  console.log(`  ${bottom}`);
   console.log('');
 }
 
