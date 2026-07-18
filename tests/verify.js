@@ -22,8 +22,58 @@ async function runTests() {
   ui.sectionHeader('VERIFICATION TEST SUITE', '🧪');
   console.log('');
 
-  // ── Test 1: Enqueuing & Validation ───────────────────────────
-  console.log(`  ${ui.C.header('Test 1:')} Enqueuing jobs...`);
+  // ── Test 1: Concurrency Enqueuing ───────────────────────────
+  console.log(`  ${ui.C.header('Test 1:')} Enqueuing jobs for concurrency verification...`);
+
+  // Enqueue 4 parallel concurrency jobs
+  for (let i = 1; i <= 4; i++) {
+    queue.enqueue({
+      id: `c-job-${i}`,
+      command: 'node -e "setTimeout(() => {}, 500)"',
+    });
+  }
+
+  ui.table(
+    [
+      { key: 'id', label: 'ID' },
+      { key: 'command', label: 'COMMAND' },
+      { key: 'state', label: 'STATE' },
+    ],
+    queue.listJobs().map(j => ({
+      id: ui.C.accent(j.id),
+      command: ui.C.white(j.command),
+      state: ui.stateBadge(j.state),
+    }))
+  );
+
+  ui.success('Concurrency jobs enqueued.');
+
+  // ── Test 2: Concurrency & Lock checks (Multiple Workers) ─────
+  console.log(`\n  ${ui.C.header('Test 2:')} Verifying concurrency (multiple workers processing without overlap)...`);
+
+  // Start 3 workers simultaneously to process jobs
+  const worker1 = startWorker(20001);
+  const worker2 = startWorker(20002);
+  const worker3 = startWorker(20003);
+
+  await delay(1500);
+
+  // Stop concurrency workers
+  db.prepare("UPDATE workers SET status = 'stopping' WHERE pid IN (20001, 20002, 20003)").run();
+  await Promise.all([worker1, worker2, worker3]);
+
+  // Check database log count per job to ensure no double execution
+  const cJobs = queue.listJobs().filter(j => j.id.startsWith('c-job-'));
+  for (const job of cJobs) {
+    const logs = db.prepare('SELECT COUNT(*) as count FROM job_logs WHERE job_id = ?').get(job.id);
+    if (logs.count > 1) {
+      throw new Error(`Job ${job.id} was processed multiple times! Concurrency lock failed.`);
+    }
+  }
+  ui.success('Concurrency verified. 3 workers processed concurrent jobs without overlap.');
+
+  // ── Test 3: Lifecycle Enqueuing ──────────────────────────────
+  console.log(`\n  ${ui.C.header('Test 3:')} Enqueuing lifecycle jobs...`);
 
   queue.enqueue({
     id: 'success-job',
@@ -51,7 +101,7 @@ async function runTests() {
       { key: 'state', label: 'STATE' },
       { key: 'timeout', label: 'TIMEOUT' },
     ],
-    queue.listJobs().map(j => ({
+    queue.listJobs().filter(j => ['success-job', 'fail-job', 'timeout-job'].includes(j.id)).map(j => ({
       id: ui.C.accent(j.id),
       command: ui.C.white(j.command),
       state: ui.stateBadge(j.state),
@@ -59,15 +109,15 @@ async function runTests() {
     }))
   );
 
-  ui.success('3 jobs enqueued.');
+  ui.success('Lifecycle jobs enqueued.');
 
-  // ── Test 2: Starting main worker ──────────────────────────────
-  console.log(`\n  ${ui.C.header('Test 2:')} Starting worker to process jobs...`);
+  // ── Test 4: Starting main worker ──────────────────────────────
+  console.log(`\n  ${ui.C.header('Test 4:')} Starting main worker to process enqueued jobs...`);
   const workerPromise = startWorker(9999);
   await delay(4000);
 
-  // ── Test 3: Checking job states after initial processing ──────
-  console.log(`\n  ${ui.C.header('Test 3:')} Checking job states after initial processing...`);
+  // ── Test 5: Checking job states after initial processing ──────
+  console.log(`\n  ${ui.C.header('Test 5:')} Checking job states after initial processing...`);
 
   let jobs = queue.listJobs();
   ui.table(
@@ -87,8 +137,8 @@ async function runTests() {
   if (successJob.state !== 'completed') throw new Error('success-job did not complete!');
   ui.success('success-job completed correctly.');
 
-  // ── Test 4: Wait for backoff & DLQ ───────────────────────────
-  console.log(`\n  ${ui.C.header('Test 4:')} Waiting for exponential backoff & DLQ migration...`);
+  // ── Test 6: Wait for backoff & DLQ ───────────────────────────
+  console.log(`\n  ${ui.C.header('Test 6:')} Waiting for exponential backoff & DLQ migration...`);
   await delay(4000);
 
   jobs = queue.listJobs();
@@ -111,8 +161,8 @@ async function runTests() {
   if (deadJobs.length !== 2) throw new Error(`Expected 2 DLQ jobs, found ${deadJobs.length}`);
   ui.success('Failed and timed-out jobs correctly moved to DLQ.');
 
-  // ── Test 5: DLQ retry ────────────────────────────────────────
-  console.log(`\n  ${ui.C.header('Test 5:')} Retrying a job from DLQ...`);
+  // ── Test 7: DLQ retry ────────────────────────────────────────
+  console.log(`\n  ${ui.C.header('Test 7:')} Retrying a job from DLQ...`);
   queue.retryDlq('fail-job');
   const retriedJob = queue.listJobs().find(j => j.id === 'fail-job');
   if (retriedJob.state !== 'pending' || retriedJob.attempts !== 0) {
@@ -120,45 +170,13 @@ async function runTests() {
   }
   ui.success('DLQ retry reset fail-job back to pending.');
 
-  // ── Test 6: Stopping main worker ────────────────────────────
-  console.log(`\n  ${ui.C.header('Test 6:')} Stopping worker...`);
+  // ── Test 8: Stopping main worker ────────────────────────────
+  console.log(`\n  ${ui.C.header('Test 8:')} Stopping worker...`);
   db.prepare("UPDATE workers SET status = 'stopping' WHERE pid = ?").run(9999);
   await delay(1500);
 
-  // ── Test 7: Concurrency & Lock checks (Multiple Workers) ─────
-  console.log(`\n  ${ui.C.header('Test 7:')} Verifying concurrency (multiple workers processing without overlap)...`);
-  
-  // Enqueue 4 parallel concurrency jobs
-  for (let i = 1; i <= 4; i++) {
-    queue.enqueue({
-      id: `c-job-${i}`,
-      command: 'node -e "setTimeout(() => {}, 500)"',
-    });
-  }
-
-  // Start 3 workers simultaneously to process jobs
-  const worker1 = startWorker(20001);
-  const worker2 = startWorker(20002);
-  const worker3 = startWorker(20003);
-
-  await delay(1500);
-
-  // Stop concurrency workers
-  db.prepare("UPDATE workers SET status = 'stopping' WHERE pid IN (20001, 20002, 20003)").run();
-  await Promise.all([worker1, worker2, worker3]);
-
-  // Check database log count per job to ensure no double execution
-  const cJobs = queue.listJobs().filter(j => j.id.startsWith('c-job-'));
-  for (const job of cJobs) {
-    const logs = db.prepare('SELECT COUNT(*) as count FROM job_logs WHERE job_id = ?').get(job.id);
-    if (logs.count > 1) {
-      throw new Error(`Job ${job.id} was processed multiple times! Concurrency lock failed.`);
-    }
-  }
-  ui.success('Concurrency verified. 3 workers processed concurrent jobs without overlap.');
-
-  // ── Test 8: Restart & Persistence ────────────────────────────
-  console.log(`\n  ${ui.C.header('Test 8:')} Verifying job persistence across engine restarts...`);
+  // ── Test 9: Restart & Persistence ────────────────────────────
+  console.log(`\n  ${ui.C.header('Test 9:')} Verifying job persistence across engine restarts...`);
   
   // Open separate sqlite connection, read job, close, and verify survival
   const dbTest = new Database(dbPath);
@@ -173,8 +191,8 @@ async function runTests() {
 
   ui.success('Persistence verified. Job data survived connection reset & restart.');
 
-  // ── Test 9: Execution Metrics ───────────────────────────────
-  console.log(`\n  ${ui.C.header('Test 9:')} Execution Metrics...`);
+  // ── Test 10: Execution Metrics ───────────────────────────────
+  console.log(`\n  ${ui.C.header('Test 10:')} Execution Metrics...`);
   const metrics = queue.getMetrics();
 
   ui.sectionHeader('EXECUTION METRICS', '📊');
@@ -190,8 +208,8 @@ async function runTests() {
   ]);
   ui.success('Metrics calculated correctly.');
 
-  // ── Test 10: Job Output Logs ────────────────────────────────
-  console.log(`\n  ${ui.C.header('Test 10:')} Job Output Logs...`);
+  // ── Test 11: Job Output Logs ────────────────────────────────
+  console.log(`\n  ${ui.C.header('Test 11:')} Job Output Logs...`);
 
   const successLogs = queue.getJobLogs('success-job');
   const failLogs = queue.getJobLogs('fail-job');
@@ -238,9 +256,7 @@ async function runTests() {
 
   // ── Results ─────────────────────────────────────────────────
   ui.sectionHeader('ALL VERIFICATION TESTS PASSED', '🎉');
-  console.log(`  ${ui.C.success('✔')} Core: enqueue, concurrency locks, persistence, retries, backoff, DLQ, shutdown`);
-  console.log(`  ${ui.C.success('✔')} Bonus: metrics, job output logging`);
-  console.log('');
+ console.log('');
   process.exit(0);
 }
 
