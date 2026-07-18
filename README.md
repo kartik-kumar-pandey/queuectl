@@ -97,12 +97,18 @@ queuectl ➜
 
 ### 1. Job Lifecycle
 Jobs progress through the following states:
+```mermaid
+stateDiagram-v2
+    direction LR
+    [*] --> pending: Enqueue
+    pending --> processing: Worker claims job
+    processing --> completed: Exit code 0
+    processing --> failed: Exit code != 0
+    failed --> pending: Retry (attempts < max_retries)
+    failed --> dead: DLQ (attempts >= max_retries)
+    dead --> pending: DLQ retry
 ```
- [pending] -> [processing] -> [completed]
-     ^              |
-     | (retry)      v (failure)
-     └-----------[failed] -> [dead] (DLQ after max_retries)
-```
+
 
 - **`pending`**: Waiting to be picked up by a worker.
 - **`processing`**: Currently being executed by a worker process.
@@ -227,6 +233,56 @@ queuectl ui --port 5000
   queuectl config set max-retries 5
   ```
   *(e.g., config set backoff-base 3)*
+---
+
+## 🗄️ Database Schema
+
+QueueCTL uses a local SQLite database (`queuectl.db`) to persist state. The database schema consists of four tables:
+
+```sql
+-- Core job storage
+CREATE TABLE jobs (
+  id            TEXT PRIMARY KEY,       -- User-defined unique identifier
+  command       TEXT NOT NULL,          -- Shell command to execute
+  state         TEXT DEFAULT 'pending', -- pending|processing|completed|failed|dead
+  attempts      INTEGER DEFAULT 0,      -- Current attempt count
+  max_retries   INTEGER DEFAULT 3,      -- Maximum allowed retries
+  priority      INTEGER DEFAULT 0,      -- Higher = executed first
+  run_at        TEXT,                   -- ISO timestamp for delayed/retry scheduling
+  timeout       INTEGER,                -- Execution timeout in seconds (NULL = unlimited)
+  error_message TEXT,                   -- Last error message
+  output        TEXT,                   -- Last stdout output
+  started_at    TEXT,                   -- When processing began
+  duration_ms   INTEGER,                -- Execution duration in milliseconds
+  created_at    TEXT NOT NULL,          -- Job creation timestamp
+  updated_at    TEXT NOT NULL           -- Last state change timestamp
+);
+
+-- Per-attempt execution logs
+CREATE TABLE job_logs (
+  id            INTEGER PRIMARY KEY AUTOINCREMENT,
+  job_id        TEXT NOT NULL,          -- FK to jobs.id
+  attempt       INTEGER NOT NULL,       -- Attempt number (1-indexed)
+  stdout        TEXT,                   -- Captured stdout
+  stderr        TEXT,                   -- Captured stderr
+  exit_code     INTEGER,                -- Process exit code (0=success, -1=error)
+  duration_ms   INTEGER,                -- Attempt duration
+  created_at    TEXT NOT NULL
+);
+
+-- Worker process registry
+CREATE TABLE workers (
+  pid             INTEGER PRIMARY KEY,  -- OS process ID
+  status          TEXT NOT NULL,        -- active|stopping
+  last_heartbeat  TEXT NOT NULL         -- ISO timestamp
+);
+
+-- Runtime configuration
+CREATE TABLE config (
+  key   TEXT PRIMARY KEY,               -- Config key name
+  value TEXT NOT NULL                   -- Config value
+);
+```
 
 ---
 
@@ -253,7 +309,7 @@ The test runner covers:
 
 A video walkthrough demonstrating QueueCTL command operations, workers, interactive session (REPL), and the Web UI console dashboard is available here:
 
-[QueueCTL Demo Walkthrough Video](#)
+[QueueCTL Demo Walkthrough Video](https://drive.google.com/file/d/1UrbKWue5BbXj25P6dEXfIj0UC6MHUEtn/view?usp=sharing)
 ---
 
 ## 🧠 Assumptions & Trade-offs

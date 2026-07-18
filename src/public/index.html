@@ -918,7 +918,8 @@
           alert('Submission Error: ' + err.message);
         }
       } catch (e) {
-        alert('Enqueue failed');
+        console.error('Enqueue error:', e);
+        alert('Enqueue failed: ' + e.message);
       }
     });
 

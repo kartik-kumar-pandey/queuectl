@@ -253,14 +253,11 @@ async function runTests() {
   );
 
   ui.success('Job output logging verified — stdout, stderr, exit codes, and durations captured.');
-
-  // ── Results ─────────────────────────────────────────────────
-  ui.sectionHeader('ALL VERIFICATION TESTS PASSED', '🎉');
- console.log('');
-  process.exit(0);
+  
 }
 
 runTests().catch(err => {
   ui.error(`Test failed: ${err.message}`);
   process.exit(1);
 });
+

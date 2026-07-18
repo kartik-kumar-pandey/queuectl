@@ -8,32 +8,37 @@
 
 QueueCTL is a CLI-first, local background job queue engine that executes arbitrary shell commands with automatic retry, exponential backoff, priority scheduling, and dead letter queue (DLQ) semantics. All state is persisted in a local SQLite database, ensuring durability across process restarts.
 
-```
-┌──────────────────────────────────────────────────────────┐
-│                      QueueCTL CLI                        │
-│                                                          │
-│  ┌──────────┐  ┌──────────┐  ┌──────────┐  ┌─────────┐ │
-│  │ Commands │  │   REPL   │  │  CLI UI  │  │ Web UI  │ │
-│  │ (enqueue,│  │(readline │  │ (format, │  │(HTTP +  │ │
-│  │  list,   │  │ + auto-  │  │  tables, │  │ REST    │ │
-│  │  worker, │  │ complete)│  │  badges) │  │ API)    │ │
-│  │  dlq...) │  │          │  │          │  │         │ │
-│  └────┬─────┘  └────┬─────┘  └────┬─────┘  └────┬────┘ │
-│       │              │             │              │      │
-│       └──────────────┴──────┬──────┴──────────────┘      │
-│                             │                            │
-│                    ┌────────▼────────┐                    │
-│                    │   Core Engine   │                    │
-│                    │  (queue.js,     │                    │
-│                    │   worker.js,    │                    │
-│                    │   config.js)    │                    │
-│                    └────────┬────────┘                    │
-│                             │                            │
-│                    ┌────────▼────────┐                    │
-│                    │  SQLite (WAL)   │                    │
-│                    │  queuectl.db    │                    │
-│                    └─────────────────┘                    │
-└──────────────────────────────────────────────────────────┘
+```mermaid
+flowchart TD
+    subgraph CLI ["QueueCTL CLI Interface"]
+        Commands["CLI Commands<br>(enqueue, list, worker...)"]
+        REPL["REPL Console<br>(auto-complete, history)"]
+        CLIUI["CLI UI Formatter<br>(tables, badges, colors)"]
+        WebUI["Web UI Dashboard<br>(HTTP server, REST API)"]
+    end
+
+    subgraph Core ["Core Engine"]
+        Queue["queue.js<br>(Job CRUD, DLQ)"]
+        Worker["worker.js<br>(Polling, execution)"]
+        Config["config.js<br>(Settings)"]
+    end
+
+    subgraph Storage ["Storage Layer"]
+        DB[(SQLite Database<br>queuectl.db)]
+    end
+
+    Commands --> Queue
+    REPL --> Queue
+    CLIUI --> Queue
+    WebUI --> Queue
+    
+    Queue --> DB
+    Worker --> DB
+    Config --> DB
+    
+    style CLI fill:#0f172a,stroke:#3b82f6,stroke-width:2px,color:#fff
+    style Core fill:#1e1b4b,stroke:#8b5cf6,stroke-width:2px,color:#fff
+    style Storage fill:#064e3b,stroke:#10b981,stroke-width:2px,color:#fff
 ```
 
 ---
@@ -42,41 +47,31 @@ QueueCTL is a CLI-first, local background job queue engine that executes arbitra
 
 Jobs transition through five states. The state machine is enforced at the database level — workers atomically transition jobs using `BEGIN IMMEDIATE` transactions.
 
-```
-                          ┌─────────────┐
-                          │   ENQUEUE   │
-                          └──────┬──────┘
-                                 │
-                                 ▼
-                          ┌─────────────┐
-               ┌──────────│   pending   │◄──────────┐
-               │          └──────┬──────┘           │
-               │                 │                  │
-               │    (worker claims job via          │
-               │     atomic transaction)            │
-               │                 │                  │
-               │                 ▼                  │
-               │          ┌─────────────┐           │
-               │          │ processing  │           │
-               │          └──┬──────┬───┘           │
-               │             │      │               │
-               │      (exit 0)    (exit ≠ 0)        │
-               │             │      │               │
-               │             ▼      ▼               │
-               │    ┌──────────┐ ┌─────────┐        │
-               │    │completed │ │ failed  │────────┘
-               │    └──────────┘ └────┬────┘  (retry with
-               │                      │        backoff if
-               │                      │        attempts <
-               │                      │        max_retries)
-               │                      │
-               │                      ▼
-               │               ┌─────────────┐
-               │               │  dead (DLQ) │
-               │               └──────┬──────┘
-               │                      │
-               │               (dlq retry)
-               └──────────────────────┘
+```mermaid
+stateDiagram-v2
+    direction TB
+    [*] --> pending: Enqueue Job
+    
+    state pending {
+        [*] --> Idle
+        Idle --> Eligible: Current time >= run_at
+    }
+    
+    pending --> processing: Worker claims job (BEGIN IMMEDIATE)
+    
+    state processing {
+        [*] --> Executing
+        Executing --> CapturingLogs: Command running
+    }
+    
+    processing --> completed: Process Exit 0
+    processing --> failed: Process Exit != 0
+    
+    failed --> pending: Re-queue with exponential backoff<br>(attempts < max_retries)
+    failed --> dead: Move to DLQ<br>(attempts >= max_retries)
+    
+    dead --> pending: Resurrect / DLQ retry
+    completed --> [*]
 ```
 
 ### State Definitions
@@ -141,51 +136,44 @@ WAL allows concurrent **readers** (e.g., `status`, `list`, `metrics` commands) w
 
 ### Worker Lifecycle
 
-```
-┌─────────────┐
-│  fork()     │  ← parent spawns via child_process.fork()
-└──────┬──────┘
-       │
-       ▼
-┌──────────────┐
-│  Register    │  ← INSERT INTO workers (pid, status='active')
-│  in DB       │
-└──────┬───────┘
-       │
-       ▼
-┌──────────────┐     ┌───────────────┐
-│  Main Loop   │────►│ claimNextJob()│
-│  (while      │     │ (atomic txn)  │
-│  !isStopping)│     └───────┬───────┘
-└──────┬───────┘             │
-       │              ┌──────▼──────┐
-       │              │ Execute cmd │
-       │              │ (spawn)     │
-       │              └──────┬──────┘
-       │                     │
-       │              ┌──────▼──────┐
-       │              │ Log result  │
-       │              │ to job_logs │
-       │              └──────┬──────┘
-       │                     │
-       │              ┌──────▼──────────┐
-       │              │ Update job      │
-       │              │ state in DB     │
-       │              │ (completed/     │
-       │              │  failed/dead)   │
-       │              └─────────────────┘
-       │
-       ▼
-┌──────────────┐
-│  Heartbeat   │  ← Every 3 seconds, UPDATE workers SET last_heartbeat
-│  (setInterval)│
-└──────────────┘
-       │
-       ▼ (on SIGINT/SIGTERM or DB status='stopping')
-┌──────────────┐
-│  Graceful    │  ← Finish current job, then DELETE FROM workers
-│  Shutdown    │
-└──────────────┘
+```mermaid
+sequenceDiagram
+    autonumber
+    actor Parent as Parent Process
+    participant Worker as Worker (worker.js)
+    participant DB as SQLite DB
+    participant Process as Executed Command
+    
+    Parent->>Worker: fork()
+    Worker->>DB: Register worker (INSERT INTO workers)
+    
+    loop While not stopping
+        Worker->>DB: claimNextJob() inside transaction (BEGIN IMMEDIATE)
+        alt Job found
+            DB-->>Worker: Job payload
+            Worker->>DB: Update state to 'processing'
+            Worker->>Process: spawn(command)
+            Process-->>Worker: capture stdout / stderr
+            Process-->>Worker: exit code & duration
+            Worker->>DB: Insert job_logs (stdout, stderr, code)
+            alt exit code == 0
+                Worker->>DB: Update state to 'completed'
+            else exit code != 0
+                alt attempts < max_retries
+                    Worker->>DB: Update state to 'failed' + compute run_at (backoff)
+                else attempts >= max_retries
+                    Worker->>DB: Update state to 'dead' (DLQ)
+                end
+            end
+        else No job found
+            DB-->>Worker: null
+            Worker->>Worker: sleep 1 second (idle poll)
+        end
+        Note over Worker, DB: Heartbeat every 3s (last_heartbeat = now)
+    end
+    
+    Worker->>DB: Deregister worker (DELETE FROM workers)
+    Worker-->>Parent: Exit process
 ```
 
 ### Key Design Decisions
@@ -321,23 +309,35 @@ All command actions are wrapped in `actionWrapper()`, which catches errors and d
 
 The Web UI is an embedded HTTP server that serves a single-page HTML dashboard with a REST API backend.
 
-```
-Browser                         QueueCTL Process
-┌──────────┐                   ┌──────────────────┐
-│          │   GET /           │                  │
-│  index   │◄─────────────────│  ui-server.js    │
-│  .html   │                   │  (http.createServer)│
-│          │                   │                  │
-│          │   GET /api/status │                  │
-│  fetch() │◄─────────────────│  queue.getStatus()│
-│          │                   │                  │
-│          │   GET /api/jobs   │                  │
-│  fetch() │◄─────────────────│  queue.listJobs() │
-│          │                   │                  │
-│          │   POST /api/enqueue│                 │
-│  fetch() │─────────────────►│  queue.enqueue()  │
-│          │                   │                  │
-└──────────┘                   └──────────────────┘
+```mermaid
+graph LR
+    subgraph Browser ["Web Browser (UI)"]
+        SPA["index.html SPA<br>(JS / CSS)"]
+    end
+
+    subgraph Server ["QueueCTL Server Process"]
+        HTTP["HTTP Server<br>(ui-server.js)"]
+        API["REST API Handlers"]
+        CoreAPI["Core Queue API<br>(queue.js)"]
+    end
+
+    subgraph DB ["SQLite Storage"]
+        SQLite[(queuectl.db)]
+    end
+
+    SPA -->|1. GET /| HTTP
+    SPA -->|2. GET /api/status| API
+    SPA -->|3. GET /api/jobs| API
+    SPA -->|4. POST /api/enqueue| API
+    SPA -->|5. POST /api/dlq/retry| API
+
+    HTTP -->|Serves static files| SPA
+    API --> CoreAPI
+    CoreAPI --> SQLite
+
+    style Browser fill:#0f172a,stroke:#3b82f6,stroke-width:2px,color:#fff
+    style Server fill:#1e1b4b,stroke:#8b5cf6,stroke-width:2px,color:#fff
+    style DB fill:#064e3b,stroke:#10b981,stroke-width:2px,color:#fff
 ```
 
 ### API Endpoints
